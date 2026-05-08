@@ -1,6 +1,7 @@
 using ICSharpCode.SharpZipLib.GZip;
-using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.ComponentModel;
 using System.Security.Cryptography;
 
 namespace DAZWSaveTool
@@ -31,7 +32,7 @@ namespace DAZWSaveTool
                 xorkey = unchecked((ulong)(-1024797686));
                 openFileDialog1.Filter = "Encoded .sav files(*.sav)|*.sav";
             }
-            else if (ToolMode.SelectedIndex == 1 || ToolMode.SelectedIndex == 3)
+            else if (ToolMode.SelectedIndex == 1 || ToolMode.SelectedIndex == 3 || ToolMode.SelectedIndex == 4)
             {
                 xorkey = 60689136UL;
                 openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
@@ -45,7 +46,7 @@ namespace DAZWSaveTool
             if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
                 return;
             string temp = openFileDialog1.FileName;
-            if (ToolMode.SelectedIndex != 3)
+            if (ToolMode.SelectedIndex < 3)
             {
                 if (ToolMode.SelectedIndex == 2)
                 {
@@ -72,9 +73,9 @@ namespace DAZWSaveTool
                     }
                 }
             }
-            else
+            else if (ToolMode.SelectedIndex == 3)
             {
-                byte[] key = Convert.FromBase64String("VjR2BNKI0CT+uMOiUGmORA=="); // Leaving the key open is truly a genius idea
+                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA=="); // Leaving the key open is truly a genius idea
                 byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
 
                 using Aes aes = Aes.Create();
@@ -94,8 +95,47 @@ namespace DAZWSaveTool
                 decryptedData = ms.ToArray();
                 File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
             }
+            else
+            {
+                // 4.3.7+ encryption, which is AES with a 256 byte RSA signature at the end of the file.
+                // The IV is the first 16 bytes of the file, and the AES payload is everything from byte 16 to the start of the RSA signature
+                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA==");
+                byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
 
-            if (ToolMode.SelectedIndex != 3)
+                // The total length of the AES portion is the file length minus the 256 signature bytes
+                int aesTotalLength = rawData.Length - 256;
+
+                // Copy the first 16 bytes of the file into the IV array
+                byte[] IV = new byte[16];
+                Array.Copy(rawData, 0, IV, 0, 16);
+
+                // Everything from byte 16 up to the start of the RSA signature
+                int payloadLength = aesTotalLength - 16;
+                byte[] aesPayload = new byte[payloadLength];
+                Array.Copy(rawData, 16, aesPayload, 0, payloadLength);
+
+                // Decryption
+                using Aes aes = Aes.Create();
+                aes.Key = key;
+                aes.IV = IV;
+                aes.Mode = CipherMode.CBC;
+
+                byte[] decryptedData;
+
+                using (MemoryStream msInput = new MemoryStream(aesPayload))
+                using (MemoryStream msOutput = new MemoryStream())
+                {
+                    using (CryptoStream cs = new CryptoStream(msInput, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                    {
+                        cs.CopyTo(msOutput);
+                    }
+                    decryptedData = msOutput.ToArray();
+                }
+
+                File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
+            }
+
+            if (ToolMode.SelectedIndex < 3)
             {
                 string filename2;
                 if (ToolMode.SelectedIndex == 2)
@@ -143,11 +183,17 @@ namespace DAZWSaveTool
                 openFileDialog1.Filter = "Decoded config data(*.zip)|*.zip";
                 type = ".temp";
             }
+            else if (ToolMode.SelectedIndex == 4)
+            {
+                xorkey = unchecked((ulong)(-1335824931));
+                openFileDialog1.Filter = "Decoded config data(*.zip)|*.zip";
+                type = ".temp";
+            }
             else { return; }
             if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
                 return;
 
-            if (ToolMode.SelectedIndex != 3)
+            if (ToolMode.SelectedIndex < 3)
             {
                 using (Stream stream2 = File.OpenRead(openFileDialog1.FileName))
                 {
@@ -186,9 +232,9 @@ namespace DAZWSaveTool
                     File.WriteAllText(openFileDialog1.FileName.Replace(".json", "") + ".txt", Base64String);
                 }
             }
-            else
+            else if (ToolMode.SelectedIndex == 3)
             {
-                byte[] key = Convert.FromBase64String("VjR2BNKI0CT+uMOiUGmORA=="); // Leaving the key open is truly a genius idea
+                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA=="); // Leaving the key open is truly a genius idea
                 byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
 
                 using Aes aes = Aes.Create();
@@ -207,6 +253,58 @@ namespace DAZWSaveTool
 
                 encryptedData = ms.ToArray();
                 File.WriteAllBytes(openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 4), encryptedData);
+            }
+            else
+            {
+                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA==");
+                byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
+
+                byte[] compressedData;
+                using (MemoryStream gzipMs = new MemoryStream())
+                {
+                    using (System.IO.Compression.GZipStream gzip = new System.IO.Compression.GZipStream(gzipMs, System.IO.Compression.CompressionMode.Compress))
+                    {
+                        gzip.Write(rawData, 0, rawData.Length);
+                    }
+                    compressedData = gzipMs.ToArray();
+                }
+
+                // Setup AES Encryption
+                using Aes aes = Aes.Create();
+                aes.Key = key;
+                aes.GenerateIV(); // Dynamically generates a secure 16-byte IV
+                aes.Mode = CipherMode.CBC;
+
+                // Construct the encrypted payload
+                using MemoryStream ms = new MemoryStream();
+
+                // Write the 16-byte IV first
+                ms.Write(aes.IV, 0, aes.IV.Length);
+
+                // Encrypt the compressed data and write it after the IV
+                using (CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                {
+                    cs.Write(compressedData, 0, compressedData.Length);
+                    cs.FlushFinalBlock();
+                }
+
+                byte[] finalEncryptedData = ms.ToArray();
+
+                // Save the file and append the 256-byte dummy RSA signature
+                string outputPath = openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 4) + "_encoded.cfg";
+
+                // In C#, a new byte array is automatically filled with zeros
+                byte[] dummySignature = new byte[256];
+
+                // Write both blocks sequentially to the file
+                using (FileStream fs = new FileStream(outputPath, FileMode.Create))
+                {
+                    // Write the AES payload (which includes the prepended IV)
+                    fs.Write(finalEncryptedData, 0, finalEncryptedData.Length);
+
+                    // Write the 256 empty bytes at the very end
+                    fs.Write(dummySignature, 0, dummySignature.Length);
+                }
             }
             MessageBox.Show("File saved.");
         }

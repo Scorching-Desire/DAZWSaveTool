@@ -52,7 +52,7 @@
             // 
             ToolMode.DropDownStyle = ComboBoxStyle.DropDownList;
             ToolMode.FormattingEnabled = true;
-            ToolMode.Items.AddRange(new object[] { resources.GetString("ToolMode.Items"), resources.GetString("ToolMode.Items1"), resources.GetString("ToolMode.Items2"), resources.GetString("ToolMode.Items3") });
+            ToolMode.Items.AddRange(new object[] { resources.GetString("ToolMode.Items"), resources.GetString("ToolMode.Items1"), resources.GetString("ToolMode.Items2"), resources.GetString("ToolMode.Items3"), resources.GetString("ToolMode.Items4") });
             resources.ApplyResources(ToolMode, "ToolMode");
             ToolMode.Name = "ToolMode";
             // 

@@ -75,7 +75,7 @@ namespace DAZWSaveTool
             }
             else if (ToolMode.SelectedIndex == 3)
             {
-                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA=="); // Leaving the key open is truly a genius idea
+                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ=="); // Leaving the key open is truly a genius idea
                 byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
 
                 using Aes aes = Aes.Create();
@@ -99,7 +99,7 @@ namespace DAZWSaveTool
             {
                 // 4.3.7+ encryption, which is AES with a 256 byte RSA signature at the end of the file.
                 // The IV is the first 16 bytes of the file, and the AES payload is everything from byte 16 to the start of the RSA signature
-                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA==");
+                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ==");
                 byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
 
                 // The total length of the AES portion is the file length minus the 256 signature bytes
@@ -234,7 +234,7 @@ namespace DAZWSaveTool
             }
             else if (ToolMode.SelectedIndex == 3)
             {
-                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA=="); // Leaving the key open is truly a genius idea
+                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ=="); // Leaving the key open is truly a genius idea
                 byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
 
                 using Aes aes = Aes.Create();
@@ -256,7 +256,7 @@ namespace DAZWSaveTool
             }
             else
             {
-                byte[] key = Convert.FromBase64String("q96FlyDZLrTKhPiIB5EwwA==");
+                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ==");
                 byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
 
                 byte[] compressedData;

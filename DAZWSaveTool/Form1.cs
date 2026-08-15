@@ -2,7 +2,9 @@ using ICSharpCode.SharpZipLib.GZip;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.ComponentModel;
+using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace DAZWSaveTool
 {
@@ -27,28 +29,41 @@ namespace DAZWSaveTool
         {
             ulong xorkey;
             OpenFileDialog openFileDialog1 = new();
-            if (ToolMode.SelectedIndex == 0)
+            switch (ToolMode.SelectedIndex)
             {
-                xorkey = unchecked((ulong)(-1024797686));
-                openFileDialog1.Filter = "Encoded .sav files(*.sav)|*.sav";
+                case 0:
+                    xorkey = unchecked((ulong)(-1024797686));
+                    openFileDialog1.Filter = "Encoded .sav files(*.sav)|*.sav";
+                    break;
+                case 1:
+                    xorkey = unchecked((ulong)(-1335824931));
+                    openFileDialog1.Filter = "Encoded save data(*.txt)|*.txt";
+                    break;
+                case 2:
+                    xorkey = 60689136UL;
+                    openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
+                    break;
+                case 3:
+                    xorkey = 60689136UL;
+                    openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
+                    break;
+                case 4:
+                    xorkey = 60689136UL;
+                    openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
+                    break;
+                case 5:
+                    xorkey = 0;
+                    openFileDialog1.Filter = "Encoded localization file(*.l10n)|*.l10n";
+                    break;
+                default:
+                    return;
             }
-            else if (ToolMode.SelectedIndex == 1 || ToolMode.SelectedIndex == 3 || ToolMode.SelectedIndex == 4)
-            {
-                xorkey = 60689136UL;
-                openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
-            }
-            else if (ToolMode.SelectedIndex == 2)
-            {
-                xorkey = unchecked((ulong)(-1335824931));
-                openFileDialog1.Filter = "Encoded save data(*.txt)|*.txt";
-            }
-            else { return; }
             if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
                 return;
             string temp = openFileDialog1.FileName;
             if (ToolMode.SelectedIndex < 3)
             {
-                if (ToolMode.SelectedIndex == 2)
+                if (ToolMode.SelectedIndex == 1)
                 {
                     byte[] Base64StrBytes = Convert.FromBase64String(File.ReadAllText(openFileDialog1.FileName));
                     File.WriteAllBytes(openFileDialog1.FileName + ".temp", Base64StrBytes);
@@ -73,10 +88,10 @@ namespace DAZWSaveTool
                     }
                 }
             }
-            else if (ToolMode.SelectedIndex == 3)
+            else if (ToolMode.SelectedIndex == 3 || ToolMode.SelectedIndex == 5)
             {
-                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ=="); // Leaving the key open is truly a genius idea
-                byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
+                byte[] key = Convert.FromBase64String(aesKey.Text);
+                byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
                 using Aes aes = Aes.Create();
                 aes.Key = key;
@@ -93,13 +108,20 @@ namespace DAZWSaveTool
                 }
 
                 decryptedData = ms.ToArray();
-                File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
+                if (ToolMode.SelectedIndex == 3)
+                {
+                    File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
+                }
+                else
+                {
+                    File.WriteAllBytes(openFileDialog1.FileName + ".gz", decryptedData);
+                }
             }
-            else
+            else if (ToolMode.SelectedIndex == 4)
             {
                 // 4.3.7+ encryption, which is AES with a 256 byte RSA signature at the end of the file.
                 // The IV is the first 16 bytes of the file, and the AES payload is everything from byte 16 to the start of the RSA signature
-                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ==");
+                byte[] key = Convert.FromBase64String(aesKey.Text);
                 byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
 
                 // The total length of the AES portion is the file length minus the 256 signature bytes
@@ -134,11 +156,28 @@ namespace DAZWSaveTool
 
                 File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
             }
-
+            else
+            {
+                using (Stream stream2 = File.OpenRead(openFileDialog1.FileName))
+                {
+                        using (GZipInputStream gzipInputStream = new GZipInputStream(stream2))
+                        {
+                            using (TextReader textReader2 = new StreamReader(gzipInputStream))
+                            {
+                                using (JsonReader jsonReader2 = new JsonTextReader(textReader2))
+                                {
+                                    gzipInputStream.IsStreamOwner = false;
+                                    this.loadedDataRoot = (JObject)JToken.ReadFrom(jsonReader2);
+                                    this.loadedData = this.loadedDataRoot;
+                                }
+                            }
+                        }
+                }
+            }
             if (ToolMode.SelectedIndex < 3)
             {
                 string filename2;
-                if (ToolMode.SelectedIndex == 2)
+                if (ToolMode.SelectedIndex == 1)
                 {
                     File.Delete(openFileDialog1.FileName);
                     filename2 = temp.Replace(".txt", "") + ".json";
@@ -165,17 +204,18 @@ namespace DAZWSaveTool
                 openFileDialog1.Filter = "Decoded .sav files(*.json)|*.json";
                 type = ".sav";
             }
+            
             else if (ToolMode.SelectedIndex == 1)
-            {
-                xorkey = 60689136UL;
-                openFileDialog1.Filter = "Decoded config files(*.json)|*.json";
-                type = ".cfg";
-            }
-            else if (ToolMode.SelectedIndex == 2)
             {
                 xorkey = unchecked((ulong)(-1335824931));
                 openFileDialog1.Filter = "Decoded save data(*.json)|*.json";
                 type = ".temp";
+            }
+            else if (ToolMode.SelectedIndex == 2)
+            {
+                xorkey = 60689136UL;
+                openFileDialog1.Filter = "Decoded config files(*.json)|*.json";
+                type = ".cfg";
             }
             else if (ToolMode.SelectedIndex == 3)
             {
@@ -187,6 +227,12 @@ namespace DAZWSaveTool
             {
                 xorkey = unchecked((ulong)(-1335824931));
                 openFileDialog1.Filter = "Decoded config data(*.zip)|*.zip";
+                type = ".temp";
+            }
+            else if (ToolMode.SelectedIndex == 5)
+            {
+                xorkey = 0;
+                openFileDialog1.Filter = "Decoded Localization data(*.gz)|*.gz";
                 type = ".temp";
             }
             else { return; }
@@ -224,7 +270,7 @@ namespace DAZWSaveTool
                         }
                     }
                 }
-                if (ToolMode.SelectedIndex == 2)
+                if (ToolMode.SelectedIndex == 1)
                 {
                     byte[] RawBytes = File.ReadAllBytes(openFileDialog1.FileName.Replace(".json", "") + type);
                     string Base64String = Convert.ToBase64String(RawBytes);
@@ -232,9 +278,9 @@ namespace DAZWSaveTool
                     File.WriteAllText(openFileDialog1.FileName.Replace(".json", "") + ".txt", Base64String);
                 }
             }
-            else if (ToolMode.SelectedIndex == 3)
+            else if (ToolMode.SelectedIndex == 3 || ToolMode.SelectedIndex == 5)
             {
-                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ=="); // Leaving the key open is truly a genius idea
+                byte[] key = Convert.FromBase64String(aesKey.Text); // Leaving the key open is truly a genius idea
                 byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
 
                 using Aes aes = Aes.Create();
@@ -252,11 +298,18 @@ namespace DAZWSaveTool
                 }
 
                 encryptedData = ms.ToArray();
-                File.WriteAllBytes(openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 4), encryptedData);
+                if (ToolMode.SelectedIndex == 3)
+                {
+                    File.WriteAllBytes(openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 4), encryptedData);
+                }
+                else
+                {
+                    File.WriteAllBytes(openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 3), encryptedData);
+                }
             }
             else
             {
-                byte[] key = Convert.FromBase64String("bWGG60WcokNQyIlVAPSjNQ==");
+                byte[] key = Convert.FromBase64String(aesKey.Text);
                 byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
 
                 byte[] compressedData;

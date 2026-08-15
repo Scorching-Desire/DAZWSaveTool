@@ -39,6 +39,8 @@
             signedValue = new TextBox();
             label67 = new Label();
             label3 = new Label();
+            aesKey = new TextBox();
+            label4 = new Label();
             SuspendLayout();
             // 
             // DecodeStart
@@ -52,7 +54,7 @@
             // 
             ToolMode.DropDownStyle = ComboBoxStyle.DropDownList;
             ToolMode.FormattingEnabled = true;
-            ToolMode.Items.AddRange(new object[] { resources.GetString("ToolMode.Items"), resources.GetString("ToolMode.Items1"), resources.GetString("ToolMode.Items2"), resources.GetString("ToolMode.Items3"), resources.GetString("ToolMode.Items4") });
+            ToolMode.Items.AddRange(new object[] { resources.GetString("ToolMode.Items"), resources.GetString("ToolMode.Items1"), resources.GetString("ToolMode.Items2"), resources.GetString("ToolMode.Items3"), resources.GetString("ToolMode.Items4"), resources.GetString("ToolMode.Items5") });
             resources.ApplyResources(ToolMode, "ToolMode");
             ToolMode.Name = "ToolMode";
             // 
@@ -100,10 +102,22 @@
             resources.ApplyResources(label3, "label3");
             label3.Name = "label3";
             // 
+            // aesKey
+            // 
+            resources.ApplyResources(aesKey, "aesKey");
+            aesKey.Name = "aesKey";
+            // 
+            // label4
+            // 
+            resources.ApplyResources(label4, "label4");
+            label4.Name = "label4";
+            // 
             // Form1
             // 
             resources.ApplyResources(this, "$this");
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(label4);
+            Controls.Add(aesKey);
             Controls.Add(label3);
             Controls.Add(label67);
             Controls.Add(signedValue);
@@ -132,5 +146,7 @@
         private TextBox signedValue;
         private Label label67;
         private Label label3;
+        private TextBox aesKey;
+        private Label label4;
     }
 }

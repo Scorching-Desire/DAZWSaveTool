@@ -1,14 +1,9 @@
-﻿using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 using ICSharpCode.SharpZipLib.GZip;
-using System.Security.Cryptography;
 
 namespace DAZWSaveTool
 {
+    // Pulled from 2.6.2 .dll, legacy encryption method
     public enum CryptMode
     {
         // Token: 0x0400261E RID: 9758

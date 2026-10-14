@@ -1,370 +1,296 @@
 using ICSharpCode.SharpZipLib.GZip;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.ComponentModel;
+using System.Globalization;
 using System.IO.Compression;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace DAZWSaveTool
 {
     public partial class Form1 : Form
     {
-        private JObject loadedDataRoot;
-        private dynamic loadedData;
-        private byte[] decryptedData;
-        private byte[] encryptedData;
+        private const int AesBlockSize = 16;
+        private const int RsaSignatureSize = 256;
+
+        // Values correspond to the order of the ToolMode combo box items.
+        private enum FileType
+        {
+            SaveFile = 0, // *.sav files.
+            SaveGameData = 1, // Save game data (*.txt).
+            LegacyConfig = 2, // Pre-3.9.3 *.cfg files (custom encryption).
+            AesConfig = 3, // 3.9.3-4.3.5 *.cfg files (AES encryption).
+            SignedConfig = 4, // 4.3.7-4.4.2 *.cfg files (AES encryption + RSA sign).
+            AdjustedConfig = 5, // 4.4.3+ *.cfg files (AES encryption + X Secret).
+            Localization = 6, // 4.1.0-4.4.2 *.l10n files (AES encryption + RSA sign).
+            AdjustedLocalization = 7 // 4.4.3+ *.l10n files (AES encryption + X Secret).
+        }
 
         public Form1()
         {
             InitializeComponent();
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
         private void DecodeStart_Click(object sender, EventArgs e)
         {
-            ulong xorkey;
-            OpenFileDialog openFileDialog1 = new();
-            switch (ToolMode.SelectedIndex)
-            {
-                case 0:
-                    xorkey = unchecked((ulong)(-1024797686));
-                    openFileDialog1.Filter = "Encoded .sav files(*.sav)|*.sav";
-                    break;
-                case 1:
-                    xorkey = unchecked((ulong)(-1335824931));
-                    openFileDialog1.Filter = "Encoded save data(*.txt)|*.txt";
-                    break;
-                case 2:
-                    xorkey = 60689136UL;
-                    openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
-                    break;
-                case 3:
-                    xorkey = 60689136UL;
-                    openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
-                    break;
-                case 4:
-                    xorkey = 60689136UL;
-                    openFileDialog1.Filter = "Encoded config files(*.cfg)|*.cfg";
-                    break;
-                case 5:
-                    xorkey = 0;
-                    openFileDialog1.Filter = "Encoded localization file(*.l10n)|*.l10n";
-                    break;
-                default:
-                    return;
-            }
-            if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
+            if (!TryGetFileType(out FileType fileType))
                 return;
-            string temp = openFileDialog1.FileName;
-            if (ToolMode.SelectedIndex < 3)
+
+            using OpenFileDialog dialog = new() { Filter = GetDecodeFilter(fileType) };
+            if (dialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            try
             {
-                if (ToolMode.SelectedIndex == 1)
+                string inputPath = dialog.FileName;
+                switch (fileType)
                 {
-                    byte[] Base64StrBytes = Convert.FromBase64String(File.ReadAllText(openFileDialog1.FileName));
-                    File.WriteAllBytes(openFileDialog1.FileName + ".temp", Base64StrBytes);
-                    openFileDialog1.FileName += ".temp";
+                    case FileType.SaveFile:
+                    case FileType.SaveGameData:
+                    case FileType.LegacyConfig:
+                        DecodeLegacyFile(inputPath, fileType);
+                        break;
+                    case FileType.AesConfig:
+                    case FileType.Localization:
+                    case FileType.AdjustedLocalization:
+                        byte[] key = ReadAesKey(fileType == FileType.AdjustedLocalization);
+                        byte[] decoded = TransformAes(File.ReadAllBytes(inputPath), key, new byte[AesBlockSize], false);
+                        string extension = fileType == FileType.AesConfig ? ".zip" : ".gz";
+                        File.WriteAllBytes(inputPath + extension, decoded);
+                        break;
+                    case FileType.SignedConfig:
+                    case FileType.AdjustedConfig:
+                        DecodeSignedConfig(inputPath);
+                        break;
                 }
-                using (Stream stream2 = File.OpenRead(openFileDialog1.FileName))
-                {
-                    using (Stream stream3 = new CryptStream(stream2, CryptMode.Decrypt, xorkey))
-                    {
-                        using (GZipInputStream gzipInputStream = new GZipInputStream(stream3))
-                        {
-                            using (TextReader textReader2 = new StreamReader(gzipInputStream))
-                            {
-                                using (JsonReader jsonReader2 = new JsonTextReader(textReader2))
-                                {
-                                    gzipInputStream.IsStreamOwner = false;
-                                    this.loadedDataRoot = (JObject)JToken.ReadFrom(jsonReader2);
-                                    this.loadedData = this.loadedDataRoot;
-                                }
-                            }
-                        }
-                    }
-                }
+
+                MessageBox.Show("File saved.");
             }
-            else if (ToolMode.SelectedIndex == 3 || ToolMode.SelectedIndex == 5)
+            catch (Exception exception) when (IsFileOperationError(exception))
             {
-                byte[] key = Convert.FromBase64String(aesKey.Text);
-                byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-                using Aes aes = Aes.Create();
-                aes.Key = key;
-                aes.IV = IV;
-                aes.Mode = CipherMode.CBC;
-
-                byte[] encryptedData = File.ReadAllBytes(openFileDialog1.FileName);
-
-                using MemoryStream ms = new MemoryStream();
-                using (CryptoStream cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write))
-                {
-                    cs.Write(encryptedData, 0, encryptedData.Length);
-                    cs.FlushFinalBlock();
-                }
-
-                decryptedData = ms.ToArray();
-                if (ToolMode.SelectedIndex == 3)
-                {
-                    File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
-                }
-                else
-                {
-                    File.WriteAllBytes(openFileDialog1.FileName + ".gz", decryptedData);
-                }
+                MessageBox.Show(exception.Message, "Decoding failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            else if (ToolMode.SelectedIndex == 4)
-            {
-                // 4.3.7+ encryption, which is AES with a 256 byte RSA signature at the end of the file.
-                // The IV is the first 16 bytes of the file, and the AES payload is everything from byte 16 to the start of the RSA signature
-                byte[] key = Convert.FromBase64String(aesKey.Text);
-                byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
-
-                // The total length of the AES portion is the file length minus the 256 signature bytes
-                int aesTotalLength = rawData.Length - 256;
-
-                // Copy the first 16 bytes of the file into the IV array
-                byte[] IV = new byte[16];
-                Array.Copy(rawData, 0, IV, 0, 16);
-
-                // Everything from byte 16 up to the start of the RSA signature
-                int payloadLength = aesTotalLength - 16;
-                byte[] aesPayload = new byte[payloadLength];
-                Array.Copy(rawData, 16, aesPayload, 0, payloadLength);
-
-                // Decryption
-                using Aes aes = Aes.Create();
-                aes.Key = key;
-                aes.IV = IV;
-                aes.Mode = CipherMode.CBC;
-
-                byte[] decryptedData;
-
-                using (MemoryStream msInput = new MemoryStream(aesPayload))
-                using (MemoryStream msOutput = new MemoryStream())
-                {
-                    using (CryptoStream cs = new CryptoStream(msInput, aes.CreateDecryptor(), CryptoStreamMode.Read))
-                    {
-                        cs.CopyTo(msOutput);
-                    }
-                    decryptedData = msOutput.ToArray();
-                }
-
-                File.WriteAllBytes(openFileDialog1.FileName + ".zip", decryptedData);
-            }
-            else
-            {
-                using (Stream stream2 = File.OpenRead(openFileDialog1.FileName))
-                {
-                        using (GZipInputStream gzipInputStream = new GZipInputStream(stream2))
-                        {
-                            using (TextReader textReader2 = new StreamReader(gzipInputStream))
-                            {
-                                using (JsonReader jsonReader2 = new JsonTextReader(textReader2))
-                                {
-                                    gzipInputStream.IsStreamOwner = false;
-                                    this.loadedDataRoot = (JObject)JToken.ReadFrom(jsonReader2);
-                                    this.loadedData = this.loadedDataRoot;
-                                }
-                            }
-                        }
-                }
-            }
-            if (ToolMode.SelectedIndex < 3)
-            {
-                string filename2;
-                if (ToolMode.SelectedIndex == 1)
-                {
-                    File.Delete(openFileDialog1.FileName);
-                    filename2 = temp.Replace(".txt", "") + ".json";
-                }
-                else
-                {
-                    if (ToolMode.SelectedIndex == 0) { filename2 = openFileDialog1.FileName.Replace(".sav", "") + ".json"; }
-                    else { filename2 = openFileDialog1.FileName.Replace(".cfg", "") + ".json"; }
-                }
-                File.WriteAllText(filename2, loadedData.ToString());
-            }
-
-            MessageBox.Show("File saved.");
         }
 
         private void EncodeStart_Click(object sender, EventArgs e)
         {
-            ulong xorkey;
-            string type;
-            OpenFileDialog openFileDialog1 = new OpenFileDialog();
-            if (ToolMode.SelectedIndex == 0)
-            {
-                xorkey = unchecked((ulong)(-1024797686));
-                openFileDialog1.Filter = "Decoded .sav files(*.json)|*.json";
-                type = ".sav";
-            }
-            
-            else if (ToolMode.SelectedIndex == 1)
-            {
-                xorkey = unchecked((ulong)(-1335824931));
-                openFileDialog1.Filter = "Decoded save data(*.json)|*.json";
-                type = ".temp";
-            }
-            else if (ToolMode.SelectedIndex == 2)
-            {
-                xorkey = 60689136UL;
-                openFileDialog1.Filter = "Decoded config files(*.json)|*.json";
-                type = ".cfg";
-            }
-            else if (ToolMode.SelectedIndex == 3)
-            {
-                xorkey = unchecked((ulong)(-1335824931));
-                openFileDialog1.Filter = "Decoded config data(*.zip)|*.zip";
-                type = ".temp";
-            }
-            else if (ToolMode.SelectedIndex == 4)
-            {
-                xorkey = unchecked((ulong)(-1335824931));
-                openFileDialog1.Filter = "Decoded config data(*.zip)|*.zip";
-                type = ".temp";
-            }
-            else if (ToolMode.SelectedIndex == 5)
-            {
-                xorkey = 0;
-                openFileDialog1.Filter = "Decoded Localization data(*.gz)|*.gz";
-                type = ".temp";
-            }
-            else { return; }
-            if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
+            if (!TryGetFileType(out FileType fileType))
                 return;
 
-            if (ToolMode.SelectedIndex < 3)
+            using OpenFileDialog dialog = new() { Filter = GetEncodeFilter(fileType) };
+            if (dialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            try
             {
-                using (Stream stream2 = File.OpenRead(openFileDialog1.FileName))
+                string inputPath = dialog.FileName;
+                switch (fileType)
                 {
-                    using (TextReader textReader2 = new StreamReader(stream2))
-                    {
-                        using (JsonReader jsonReader2 = new JsonTextReader(textReader2))
-                        {
-                            this.loadedDataRoot = (JObject)JToken.ReadFrom(jsonReader2);
-                            this.loadedData = this.loadedDataRoot;
-                        }
-                    }
+                    case FileType.SaveFile:
+                    case FileType.SaveGameData:
+                    case FileType.LegacyConfig:
+                        EncodeLegacyFile(inputPath, fileType);
+                        break;
+                    case FileType.AesConfig:
+                    case FileType.Localization:
+                    case FileType.AdjustedLocalization:
+                        byte[] key = ReadAesKey(fileType == FileType.AdjustedLocalization);
+                        byte[] encoded = TransformAes(File.ReadAllBytes(inputPath), key, new byte[AesBlockSize], true);
+                        // Remove only the decoded archive suffix (.zip or .gz).
+                        string outputPath = Path.Combine(Path.GetDirectoryName(inputPath)!, Path.GetFileNameWithoutExtension(inputPath));
+                        File.WriteAllBytes(outputPath, encoded);
+                        break;
+                    case FileType.SignedConfig:
+                    case FileType.AdjustedConfig:
+                        EncodeSignedConfig(inputPath);
+                        break;
                 }
-                using (Stream stream4 = File.Open(openFileDialog1.FileName.Replace(".json", "") + type, FileMode.Create))
-                {
-                    using (Stream stream5 = new CryptStream(stream4, CryptMode.Crypt, xorkey))
-                    {
-                        using (GZipOutputStream gzipOutputStream = new GZipOutputStream(stream5))
-                        {
-                            using (TextWriter textWriter2 = new StreamWriter(gzipOutputStream))
-                            {
-                                using (JsonWriter jsonWriter2 = new JsonTextWriter(textWriter2))
-                                {
-                                    gzipOutputStream.IsStreamOwner = false;
-                                    gzipOutputStream.SetLevel(9);
-                                    this.loadedDataRoot.WriteTo(jsonWriter2, new JsonConverter[0]);
-                                }
-                            }
-                        }
-                    }
-                }
-                if (ToolMode.SelectedIndex == 1)
-                {
-                    byte[] RawBytes = File.ReadAllBytes(openFileDialog1.FileName.Replace(".json", "") + type);
-                    string Base64String = Convert.ToBase64String(RawBytes);
-                    File.Delete(openFileDialog1.FileName.Replace(".json", ".temp"));
-                    File.WriteAllText(openFileDialog1.FileName.Replace(".json", "") + ".txt", Base64String);
-                }
+
+                MessageBox.Show("File saved.");
             }
-            else if (ToolMode.SelectedIndex == 3 || ToolMode.SelectedIndex == 5)
+            catch (Exception exception) when (IsFileOperationError(exception))
             {
-                byte[] key = Convert.FromBase64String(aesKey.Text); // Leaving the key open is truly a genius idea
-                byte[] IV = new byte[16] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // ARE YA CODING SON? You are supposed to use it so you won't get hacked even harder
-
-                using Aes aes = Aes.Create();
-                aes.Key = key;
-                aes.IV = IV;
-                aes.Mode = CipherMode.CBC;
-
-                byte[] decryptedData = File.ReadAllBytes(openFileDialog1.FileName);
-
-                using MemoryStream ms = new MemoryStream();
-                using (CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
-                {
-                    cs.Write(decryptedData, 0, decryptedData.Length);
-                    cs.FlushFinalBlock();
-                }
-
-                encryptedData = ms.ToArray();
-                if (ToolMode.SelectedIndex == 3)
-                {
-                    File.WriteAllBytes(openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 4), encryptedData);
-                }
-                else
-                {
-                    File.WriteAllBytes(openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 3), encryptedData);
-                }
+                MessageBox.Show(exception.Message, "Encoding failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            else
-            {
-                byte[] key = Convert.FromBase64String(aesKey.Text);
-                byte[] rawData = File.ReadAllBytes(openFileDialog1.FileName);
-
-                byte[] compressedData;
-                using (MemoryStream gzipMs = new MemoryStream())
-                {
-                    using (System.IO.Compression.GZipStream gzip = new System.IO.Compression.GZipStream(gzipMs, System.IO.Compression.CompressionMode.Compress))
-                    {
-                        gzip.Write(rawData, 0, rawData.Length);
-                    }
-                    compressedData = gzipMs.ToArray();
-                }
-
-                // Setup AES Encryption
-                using Aes aes = Aes.Create();
-                aes.Key = key;
-                aes.GenerateIV(); // Dynamically generates a secure 16-byte IV
-                aes.Mode = CipherMode.CBC;
-
-                // Construct the encrypted payload
-                using MemoryStream ms = new MemoryStream();
-
-                // Write the 16-byte IV first
-                ms.Write(aes.IV, 0, aes.IV.Length);
-
-                // Encrypt the compressed data and write it after the IV
-                using (CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
-                {
-                    cs.Write(compressedData, 0, compressedData.Length);
-                    cs.FlushFinalBlock();
-                }
-
-                byte[] finalEncryptedData = ms.ToArray();
-
-                // Save the file and append the 256-byte dummy RSA signature
-                string outputPath = openFileDialog1.FileName.Remove(openFileDialog1.FileName.Length - 4) + "_encoded.cfg";
-
-                // In C#, a new byte array is automatically filled with zeros
-                byte[] dummySignature = new byte[256];
-
-                // Write both blocks sequentially to the file
-                using (FileStream fs = new FileStream(outputPath, FileMode.Create))
-                {
-                    // Write the AES payload (which includes the prepended IV)
-                    fs.Write(finalEncryptedData, 0, finalEncryptedData.Length);
-
-                    // Write the 256 empty bytes at the very end
-                    fs.Write(dummySignature, 0, dummySignature.Length);
-                }
-            }
-            MessageBox.Show("File saved.");
         }
+
+        private bool TryGetFileType(out FileType fileType)
+        {
+            fileType = (FileType)ToolMode.SelectedIndex;
+            return Enum.IsDefined(fileType);
+        }
+
+        private static string GetDecodeFilter(FileType fileType) => fileType switch
+        {
+            FileType.SaveFile => "Encoded .sav files (*.sav)|*.sav",
+            FileType.SaveGameData => "Encoded save data (*.txt)|*.txt",
+            FileType.Localization or FileType.AdjustedLocalization => "Encoded localization files (*.l10n)|*.l10n",
+            _ => "Encoded config files (*.cfg)|*.cfg"
+        };
+
+        private static string GetEncodeFilter(FileType fileType) => fileType switch
+        {
+            FileType.SaveFile => "Decoded .sav files (*.json)|*.json",
+            FileType.SaveGameData => "Decoded save data (*.json)|*.json",
+            FileType.LegacyConfig => "Decoded config files (*.json)|*.json",
+            FileType.Localization or FileType.AdjustedLocalization => "Decoded localization data (*.gz)|*.gz",
+            FileType.AdjustedConfig => "Decoded config data (*.gz;*.zip)|*.gz;*.zip",
+            _ => "Decoded config data (*.zip;*.gz)|*.zip;*.gz"
+        };
+
+        private static ulong GetXorKey(FileType fileType) => fileType switch
+        {
+            FileType.SaveFile => unchecked((ulong)-1024797686),
+            FileType.SaveGameData => unchecked((ulong)-1335824931),
+            FileType.LegacyConfig => 60689136UL,
+            _ => throw new ArgumentException("The selected file type does not use custom encryption.")
+        };
+
+        private static void DecodeLegacyFile(string inputPath, FileType fileType)
+        {
+            byte[] encoded = fileType == FileType.SaveGameData
+                ? Convert.FromBase64String(File.ReadAllText(inputPath))
+                : File.ReadAllBytes(inputPath);
+
+            using MemoryStream input = new(encoded);
+            using CryptStream decrypted = new(input, CryptMode.Decrypt, GetXorKey(fileType));
+            using GZipInputStream gzip = new(decrypted);
+            using StreamReader reader = new(gzip);
+            using JsonTextReader jsonReader = new(reader);
+            JObject data = JObject.Load(jsonReader);
+            File.WriteAllText(Path.ChangeExtension(inputPath, ".json"), data.ToString());
+        }
+
+        private static void EncodeLegacyFile(string inputPath, FileType fileType)
+        {
+            JObject data = JObject.Parse(File.ReadAllText(inputPath));
+            using MemoryStream output = new();
+            using (CryptStream encrypted = new(output, CryptMode.Crypt, GetXorKey(fileType)))
+            using (GZipOutputStream gzip = new(encrypted) { IsStreamOwner = false })
+            {
+                gzip.SetLevel(9);
+                using StreamWriter writer = new(gzip);
+                using JsonTextWriter jsonWriter = new(writer);
+                data.WriteTo(jsonWriter);
+            }
+
+            byte[] encoded = output.ToArray();
+            if (fileType == FileType.SaveGameData)
+            {
+                File.WriteAllText(Path.ChangeExtension(inputPath, ".txt"), Convert.ToBase64String(encoded));
+                return;
+            }
+
+            string extension = fileType == FileType.SaveFile ? ".sav" : ".cfg";
+            File.WriteAllBytes(Path.ChangeExtension(inputPath, extension), encoded);
+        }
+
+        private byte[] ReadAesKey(bool reverseBase64 = false)
+        {
+            string keyText = aesKey.Text.Trim();
+            if (reverseBase64)
+                keyText = ReverseBase64(keyText);
+
+            return Convert.FromBase64String(keyText);
+        }
+
+        private static string ReverseBase64(string text)
+        {
+            // Reverse the key text while keeping its trailing Base64 padding in place.
+            string unpadded = text.TrimEnd('=');
+            return new string(unpadded.Reverse().ToArray()) + text[unpadded.Length..];
+        }
+
+        private static byte[] ParseSecretX(string text)
+        {
+            string[] values = text.Split(',');
+            if (values.Length != AesBlockSize)
+                throw new FormatException("xArray must contain exactly 16 comma-separated decimal bytes (0-255).");
+
+            byte[] secretX = new byte[AesBlockSize];
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (!byte.TryParse(values[i].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out secretX[i]))
+                    throw new FormatException($"xArray value {i + 1} must be a decimal byte between 0 and 255.");
+            }
+
+            return secretX;
+        }
+
+        private void DecodeSignedConfig(string inputPath)
+        {
+            byte[] secretX = ParseSecretX(xArray.Text);
+            byte[] baseKey = ReadAesKey(reverseBase64: true);
+            if (baseKey.Length != AesBlockSize)
+                throw new FormatException("The reversed AES key must decode to exactly 16 bytes.");
+
+            byte[] adjustedKey = new byte[AesBlockSize];
+            for (int i = 0; i < adjustedKey.Length; i++)
+                adjustedKey[i] = (byte)(baseKey[i] ^ secretX[i]);
+
+            byte[] rawData = File.ReadAllBytes(inputPath);
+            int payloadLength = rawData.Length - AesBlockSize - RsaSignatureSize;
+            if (payloadLength <= 0 || payloadLength % AesBlockSize != 0)
+                throw new FormatException("The config must contain a 16-byte IV, an AES payload, and a 256-byte RSA signature.");
+
+            // The file starts with its IV and ends with an RSA signature, excluded from decryption.
+            byte[] iv = rawData[..AesBlockSize];
+            byte[] payload = rawData[AesBlockSize..^RsaSignatureSize];
+            byte[] decoded;
+            try
+            {
+                decoded = TransformAes(payload, adjustedKey, iv, false);
+            }
+            catch (CryptographicException)
+            {
+                // A memory dump captured after the XOR adjustment already contains the final key.
+                decoded = TransformAes(payload, secretX, iv, false);
+            }
+
+            File.WriteAllBytes(inputPath + ".gz", decoded);
+        }
+
+        private void EncodeSignedConfig(string inputPath)
+        {
+            byte[] key = ReadAesKey();
+            byte[] rawData = File.ReadAllBytes(inputPath);
+            using MemoryStream compressed = new();
+            using (GZipStream gzip = new(compressed, CompressionMode.Compress, leaveOpen: true))
+                gzip.Write(rawData);
+
+            byte[] iv = RandomNumberGenerator.GetBytes(AesBlockSize);
+            byte[] encoded = TransformAes(compressed.ToArray(), key, iv, true);
+            string outputPath = Path.Combine(Path.GetDirectoryName(inputPath)!, Path.GetFileNameWithoutExtension(inputPath) + "_encoded.cfg");
+            using FileStream output = File.Create(outputPath);
+            output.Write(iv);
+            output.Write(encoded);
+            // Preserve the existing placeholder signature; this does not produce a valid RSA signature.
+            output.Write(new byte[RsaSignatureSize]);
+        }
+
+        private static byte[] TransformAes(byte[] data, byte[] key, byte[] iv, bool encrypt)
+        {
+            using Aes aes = Aes.Create();
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Mode = CipherMode.CBC;
+            aes.Padding = PaddingMode.PKCS7;
+            using ICryptoTransform transform = encrypt ? aes.CreateEncryptor() : aes.CreateDecryptor();
+            return transform.TransformFinalBlock(data, 0, data.Length);
+        }
+
+        private static bool IsFileOperationError(Exception exception) =>
+            exception is IOException or UnauthorizedAccessException or FormatException
+                or CryptographicException or JsonException or ICSharpCode.SharpZipLib.SharpZipBaseException;
 
         private void signButton_Click(object sender, EventArgs e)
         {
-            signedValue.Text = Sec.EncryptSecureInt(Int32.Parse(originalValue.Text)).ToString();
+            if (!int.TryParse(originalValue.Text, out int value))
+            {
+                MessageBox.Show("Enter a valid 32-bit integer.", "Invalid value", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            signedValue.Text = Sec.EncryptSecureInt(value).ToString();
         }
     }
 }

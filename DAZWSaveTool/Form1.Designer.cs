@@ -41,6 +41,8 @@
             label3 = new Label();
             aesKey = new TextBox();
             label4 = new Label();
+            label5 = new Label();
+            xArray = new TextBox();
             SuspendLayout();
             // 
             // DecodeStart
@@ -54,7 +56,7 @@
             // 
             ToolMode.DropDownStyle = ComboBoxStyle.DropDownList;
             ToolMode.FormattingEnabled = true;
-            ToolMode.Items.AddRange(new object[] { resources.GetString("ToolMode.Items"), resources.GetString("ToolMode.Items1"), resources.GetString("ToolMode.Items2"), resources.GetString("ToolMode.Items3"), resources.GetString("ToolMode.Items4"), resources.GetString("ToolMode.Items5") });
+            ToolMode.Items.AddRange(new object[] { resources.GetString("ToolMode.Items"), resources.GetString("ToolMode.Items1"), resources.GetString("ToolMode.Items2"), resources.GetString("ToolMode.Items3"), resources.GetString("ToolMode.Items4"), resources.GetString("ToolMode.Items5"), resources.GetString("ToolMode.Items6"), resources.GetString("ToolMode.Items7") });
             resources.ApplyResources(ToolMode, "ToolMode");
             ToolMode.Name = "ToolMode";
             // 
@@ -112,10 +114,22 @@
             resources.ApplyResources(label4, "label4");
             label4.Name = "label4";
             // 
+            // label5
+            // 
+            resources.ApplyResources(label5, "label5");
+            label5.Name = "label5";
+            // 
+            // xArray
+            // 
+            resources.ApplyResources(xArray, "xArray");
+            xArray.Name = "xArray";
+            // 
             // Form1
             // 
             resources.ApplyResources(this, "$this");
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(xArray);
+            Controls.Add(label5);
             Controls.Add(label4);
             Controls.Add(aesKey);
             Controls.Add(label3);
@@ -129,7 +143,6 @@
             Controls.Add(ToolMode);
             Controls.Add(DecodeStart);
             Name = "Form1";
-            Load += Form1_Load;
             ResumeLayout(false);
             PerformLayout();
         }
@@ -148,5 +161,7 @@
         private Label label3;
         private TextBox aesKey;
         private Label label4;
+        private Label label5;
+        private TextBox xArray;
     }
 }

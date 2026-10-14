@@ -29,10 +29,10 @@ namespace DAZWSaveTool
             BitArray bits = new BitArray(rawBytes);
             BitArray maskBits = new BitArray(maskBytes);
 
-            // 3. XOR (Matches il2cpp:01F33BBC System.Collections.BitArray$$Xor)
+            // 3. XOR (System.Collections.BitArray$$Xor)
             bits.Xor(maskBits);
 
-            // 4. Shuffle (Matches il2cpp:01F33BC4 SecureInt$$Sh)
+            // 4. Shuffle (SecureInt$$Sh)
             // The ARM64 loop runs backwards. i goes from 31 down to 1.
             for (int i = 31; i >= 1; i--)
             {

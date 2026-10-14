@@ -26,8 +26,8 @@ The type numbers match the order of the file-type selector in the application.
 
 | Type | File/data | Game version | Encryption system | Decoded output |
 | --- | --- | --- | --- | --- |
-| 0 | `*.sav` save files | Versions using the custom save format | Custom byte transformation and XOR, with GZip compression | `.json` |
-| 1 | Save game data extracted into `*.txt` | Before and after 4.4.3 | Base64 wrapping around custom byte transformation and XOR, with GZip compression | `.json` |
+| 0 | `*.sav` save files | Any | Custom byte transformation and XOR, with GZip compression | `.json` |
+| 1 | Save game data extracted into `*.txt` | Any | Base64 wrapping around custom byte transformation and XOR, with GZip compression | `.json` |
 | 2 | `*.cfg` configuration files | Before 3.9.3 | Custom byte transformation and XOR, with GZip compression | `.json` |
 | 3 | `*.cfg` configuration files | 3.9.3–4.3.5 | AES encryption | `.cfg.zip` |
 | 4 | `*.cfg` configuration files | 4.3.7–4.4.2 | AES encryption + RSA signature | `.cfg.gz` |
@@ -83,8 +83,8 @@ Running a framework-dependent build requires the .NET 10 Desktop Runtime for Win
 
 | Тип | Файл/данные | Версия игры | Система шифрования | Результат декодирования |
 | --- | --- | --- | --- | --- |
-| 0 | Файлы сохранения `*.sav` | Версии с собственным форматом сохранения | Собственное преобразование байтов и XOR, сжатие GZip | `.json` |
-| 1 | Данные сохранения, извлечённые в `*.txt` | До и после 4.4.3 | Base64 поверх собственного преобразования байтов и XOR, сжатие GZip | `.json` |
+| 0 | Файлы сохранения `*.sav` | Любая | Собственное преобразование байтов и XOR, сжатие GZip | `.json` |
+| 1 | Данные сохранения, извлечённые в `*.txt` | Любая | Base64 поверх собственного преобразования байтов и XOR, сжатие GZip | `.json` |
 | 2 | Файлы конфигурации `*.cfg` | До 3.9.3 | Собственное преобразование байтов и XOR, сжатие GZip | `.json` |
 | 3 | Файлы конфигурации `*.cfg` | 3.9.3–4.3.5 | Шифрование AES | `.cfg.zip` |
 | 4 | Файлы конфигурации `*.cfg` | 4.3.7–4.4.2 | Шифрование AES + подпись RSA | `.cfg.gz` |

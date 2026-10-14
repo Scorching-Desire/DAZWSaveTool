@@ -31,9 +31,9 @@ The type numbers match the order of the file-type selector in the application.
 | 2 | `*.cfg` configuration files | Before 3.9.3 | Custom byte transformation and XOR, with GZip compression | `.json` |
 | 3 | `*.cfg` configuration files | 3.9.3–4.3.5 | AES encryption | `.cfg.zip` |
 | 4 | `*.cfg` configuration files | 4.3.7–4.4.2 | AES encryption + RSA signature | `.cfg.gz` |
-| 5 | `*.cfg` configuration files | 4.4.3+ | AES encryption + X Secret key adjustments | `.cfg.gz` |
+| 5 | `*.cfg` configuration files | 4.4.3+ | AES encryption + X Secret + key adjustments | `.cfg.gz` |
 | 6 | `*.l10n` localization files | 4.1.0–4.4.2 | AES encryption + RSA signature | `.l10n.gz` |
-| 7 | `*.l10n` localization files | 4.4.3+ | AES encryption + X Secret key adjustments | `.l10n.gz` |
+| 7 | `*.l10n` localization files | 4.4.3+ | AES encryption + X Secret + key adjustments | `.l10n.gz` |
 
 - **Custom encryption:** the compressed bytes are transformed using their position and XORed with a repeating four-byte key. Types 0, 1, and 2 each use a different key. Type 1 also stores the encrypted bytes as Base64 text.
 - **AES:** the current implementation uses CBC mode with PKCS7 padding. Enter the Base64 key in the AES key text box. Types 3, 6, and 7 use a zero IV; the configuration handler for types 4 and 5 reads a 16-byte IV from the start of the file.
@@ -54,10 +54,6 @@ The table identifies the file types; the notes describe the current implementati
 ## Compiling
 
 Build on Windows with the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). For Visual Studio, use Visual Studio 2026 with the .NET desktop development workload.
-
-```powershell
-dotnet build DAZWSaveTool.sln --configuration Release
-```
 
 Running a framework-dependent build requires the .NET 10 Desktop Runtime for Windows.
 
@@ -92,9 +88,9 @@ Running a framework-dependent build requires the .NET 10 Desktop Runtime for Win
 | 2 | Файлы конфигурации `*.cfg` | До 3.9.3 | Собственное преобразование байтов и XOR, сжатие GZip | `.json` |
 | 3 | Файлы конфигурации `*.cfg` | 3.9.3–4.3.5 | Шифрование AES | `.cfg.zip` |
 | 4 | Файлы конфигурации `*.cfg` | 4.3.7–4.4.2 | Шифрование AES + подпись RSA | `.cfg.gz` |
-| 5 | Файлы конфигурации `*.cfg` | 4.4.3+ | Шифрование AES + преобразования ключа X Secret | `.cfg.gz` |
+| 5 | Файлы конфигурации `*.cfg` | 4.4.3+ | Шифрование AES + преобразования ключа + X Secret | `.cfg.gz` |
 | 6 | Файлы локализации `*.l10n` | 4.1.0–4.4.2 | Шифрование AES + подпись RSA | `.l10n.gz` |
-| 7 | Файлы локализации `*.l10n` | 4.4.3+ | Шифрование AES + преобразования ключа X Secret | `.l10n.gz` |
+| 7 | Файлы локализации `*.l10n` | 4.4.3+ | Шифрование AES + преобразования ключа + X Secret | `.l10n.gz` |
 
 - **Собственное шифрование:** сжатые байты преобразуются с учётом их позиции, затем применяется XOR с повторяющимся четырёхбайтовым ключом. Типы 0, 1 и 2 используют разные ключи. Для типа 1 зашифрованные байты дополнительно представлены текстом Base64.
 - **AES:** текущая реализация использует режим CBC с заполнением PKCS7. Введите ключ Base64 в поле AES key. Типы 3, 6 и 7 используют нулевой IV; обработчик конфигураций типов 4 и 5 читает 16-байтовый IV из начала файла.
@@ -115,9 +111,5 @@ Running a framework-dependent build requires the .NET 10 Desktop Runtime for Win
 ## Сборка
 
 Для сборки в Windows установите [SDK .NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Если используете Visual Studio, установите Visual Studio 2026 с рабочей нагрузкой «Разработка классических приложений .NET».
-
-```powershell
-dotnet build DAZWSaveTool.sln --configuration Release
-```
 
 Для запуска сборки, зависящей от установленной среды выполнения, требуется .NET 10 Desktop Runtime для Windows.
